@@ -6,8 +6,8 @@ public class Draw {
     int row;
     int cellSize;
 
-    final String CHARACTER = "assets/berkgokberk.png";
-    final String OBJECTIVE = "assets/computer.png";
+    final String CHARACTER = "assets/knight.png";
+    final String OBJECTIVE = "assets/coin.png";
     final String GRASS = "assets/grass1.jpeg";
     final String OBSTACLE = "assets/tree_ground.jpeg";
     final String MUD = "assets/sand.png";
