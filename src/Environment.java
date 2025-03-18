@@ -21,49 +21,16 @@ public class Environment {
         impassableObjectives = new ArrayList<>();
     }
 
-    public void generateMap(String mapData, String mapDistanceData, String objectiveData, String outputFile) {
+    public void generateMap(String mapData, String mapDistanceData,
+                            String objectiveData, String outputFile, int type) {
         readMapData(mapData);
         readMapDistanceData(mapDistanceData);
         readObjectiveData(objectiveData);
-        draw = new Draw(tiles, column, row, cellSize);
-        ArrayList<String> output = new ArrayList<>();
-        String str;
-        int counter = 1;
-        while (!objectives.isEmpty()) {
-            boolean firstLine = true;
-            draw.drawMap(sourceCoordinate, objectives, impassableObjectives);
-            Pair<Integer, Integer> destination = objectives.get(0);
-            ArrayList<Tile> path = findShortestPath(tiles[sourceCoordinate.getValue()][sourceCoordinate.getKey()],
-                    tiles[destination.getValue()][destination.getKey()]);
-            if (path.isEmpty()) {
-                str = String.format("Objective %d cannot be reached!", counter);
-                output.add(str);
-                counter ++;
-                Pair<Integer, Integer> impassableObject = objectives.remove(0);
-                impassableObjectives.add(impassableObject);
-                continue;
-            }
-            for (Tile tile : path) {
-                if (firstLine) {
-                    str = String.format("Starting position: (%d, %d)", tile.col, tile.row);
-                    if (!output.contains(str))
-                        output.add(str);
-                    firstLine = false;
-                } else {
-                    str = String.format("Move to (%d, %d)", tile.col, tile.row);
-                    output.add(str);
-                }
-            }
-            str = String.format("Objective %d reached!", counter);
-            if (!output.contains(str))
-                output.add(str);
-            animation(destination, path);
-            sourceCoordinate = destination;
-            objectives.remove(0);
-            counter ++;
+        if (type == 0) {
+            regularExecution(outputFile);
+        } else {
+            bonusExecution(outputFile);
         }
-        draw.drawMap(sourceCoordinate, objectives, impassableObjectives);
-        writeOutput(output, outputFile);
     }
 
     private void readMapData(String fileName) {
@@ -139,7 +106,7 @@ public class Environment {
         }
 
     }
-    private ArrayList<Tile> findShortestPath(Tile source, Tile destination) {
+    private Pair<ArrayList<Tile>, Double> findShortestPath(Tile source, Tile destination) {
         PriorityQueue<Pair<Tile, Double>> pq = new PriorityQueue<>(Comparator.comparingDouble(Pair::getValue));
         Map<Tile, Double> distances = new HashMap<>();
         Map<Tile, Tile> previous = new HashMap<>();
@@ -181,6 +148,10 @@ public class Environment {
             }
         }
 
+        if (distances.get(destination) == Double.POSITIVE_INFINITY) {
+            return new Pair<>(new ArrayList<>(), Double.POSITIVE_INFINITY);  // No valid path found
+        }
+
         ArrayList<Tile> path = new ArrayList<>();
         Tile step = destination;
         while (step != null) {
@@ -189,32 +160,29 @@ public class Environment {
         }
         Collections.reverse(path);
 
-        if (distances.get(destination) == Double.POSITIVE_INFINITY) {
-            return new ArrayList<>();  // No valid path found
-        }
 
         if (path.isEmpty() || path.get(0) != source) {
-            return new ArrayList<>();
+            return new Pair<>(new ArrayList<>(), Double.POSITIVE_INFINITY);
         }
 
-        return path;  // Returns the shortest path from source to destination
+        return new Pair<>(path, distances.get(destination));  // Returns the shortest path and distance from source to destination
     }
 
-    private void animation(Pair<Integer, Integer> destinationCoordinate,
-                           ArrayList<Tile> path) {
+    private void animation(ArrayList<Tile> path, int type) {
         int counter = 0;
+        Pair<Integer, Integer> destinationCoordinate = new Pair<>(path.get(path.size() - 1).col, path.get(path.size() - 1).row);
         Tile tile = path.get(counter);
         Pair<Integer, Integer> step = new Pair<>(tile.col, tile.row);
         while (!step.equals(destinationCoordinate)) {
             StdDraw.pause(PAUSE_TIME);
             StdDraw.clear();
-            draw.drawMap(step, objectives, impassableObjectives);
+            draw.drawMap(step, objectives, impassableObjectives, type);
             counter ++;
             step = new Pair<>(path.get(counter).col, path.get(counter).row);
         }
         StdDraw.pause(PAUSE_TIME);
         StdDraw.clear();
-        draw.drawMap(step, objectives, impassableObjectives);
+        draw.drawMap(step, objectives, impassableObjectives, type);
     }
 
     private void writeOutput(ArrayList<String> output, String outputFile) {
@@ -225,5 +193,94 @@ public class Environment {
         }
     }
 
+    private void regularExecution(String outputFile) {
+        draw = new Draw(tiles, column, row, cellSize);
+        ArrayList<String> output = new ArrayList<>();
+        String str;
+        int counter = 1;
+        while (!objectives.isEmpty()) {
+            boolean firstLine = true;
+            draw.drawMap(sourceCoordinate, objectives, impassableObjectives, 0);
+            Pair<Integer, Integer> destination = objectives.get(0);
+            ArrayList<Tile> path = findShortestPath(tiles[sourceCoordinate.getValue()][sourceCoordinate.getKey()],
+                    tiles[destination.getValue()][destination.getKey()]).getKey();
+            if (path.isEmpty()) {
+                str = String.format("Objective %d cannot be reached!", counter);
+                output.add(str);
+                counter++;
+                Pair<Integer, Integer> impassableObject = objectives.remove(0);
+                impassableObjectives.add(impassableObject);
+                continue;
+            }
+            for (Tile tile : path) {
+                if (firstLine) {
+                    str = String.format("Starting position: (%d, %d)", tile.col, tile.row);
+                    if (!output.contains(str))
+                        output.add(str);
+                    firstLine = false;
+                } else {
+                    str = String.format("Move to (%d, %d)", tile.col, tile.row);
+                    output.add(str);
+                }
+            }
+            str = String.format("Objective %d reached!", counter);
+            if (!output.contains(str))
+                output.add(str);
+            animation(path, 0);
+            sourceCoordinate = destination;
+            objectives.remove(0);
+            counter ++;
+        }
+        draw.drawMap(sourceCoordinate, objectives, impassableObjectives, 0);
+        writeOutput(output, outputFile);
+    }
 
+    private void bonusExecution(String outputFile) {
+        draw = new Draw(tiles, column, row, cellSize);
+        draw.drawMap(sourceCoordinate, objectives, impassableObjectives, 1);
+        int size = objectives.size() + 1;
+        double[][] distanceMatrix = new double[size][size];
+        HashMap<Pair<Integer, Integer>, ArrayList<Tile>> paths = new HashMap<>();
+
+        ArrayList<Tile> allPoints = new ArrayList<>();
+        allPoints.add(tiles[sourceCoordinate.getValue()][sourceCoordinate.getKey()]);
+        for (Pair<Integer, Integer> objective : objectives) {
+            allPoints.add(tiles[objective.getValue()][objective.getKey()]);
+        }
+
+        // Compute the shortest paths between all pairs
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (i == j) {
+                    distanceMatrix[i][j] = 0;
+                    paths.put(new Pair<>(i,j), new ArrayList<>());
+                } else {
+                    Pair<ArrayList<Tile>, Double> result = findShortestPath(allPoints.get(i), allPoints.get(j));
+                    paths.put(new Pair<>(i, j), result.getKey());
+                    distanceMatrix[i][j] = result.getValue();
+                }
+            }
+        }
+
+        HeldKarpTSP heldKarpTSP = new HeldKarpTSP(distanceMatrix);
+        Pair<Double, String> result = heldKarpTSP.solve();
+        String shortestPath = result.getValue();
+        Double shortestPathLength = result.getKey();
+        String[] pathParts = shortestPath.split(",");
+        ArrayList<Integer> path = new ArrayList<>();
+
+        for (String part : pathParts) {
+            path.add(Integer.parseInt(part));
+        }
+
+        for (int i = 0; i < path.size() - 1; i++) {
+            draw.drawMap(sourceCoordinate, objectives, impassableObjectives, 1);
+            ArrayList<Tile> currentPath = paths.get(new Pair<>(path.get(i),path.get(i+1)));
+            animation(currentPath, 1);
+            sourceCoordinate = new Pair<>(currentPath.get(currentPath.size() - 1).col, currentPath.get(currentPath.size() - 1).row);
+        }
+
+        System.out.println("Shortest Path Length: " + shortestPathLength);
+        System.out.println("Shortest Path: " + path);
+    }
 }
